@@ -8,17 +8,77 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; -webkit-tap-highlight-color: transparent; }
-        .tg-card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); padding: 16px; margin-bottom: 12px; }
-        .tg-input { width: 100%; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 16px; font-size: 16px; outline: none; transition: border-color 0.2s; }
-        .tg-input:focus { border-color: #3b82f6; }
-        .tg-button { width: 100%; background: #3b82f6; color: white; border: none; border-radius: 10px; padding: 14px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .tg-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+        .tg-input {
+            width: 100%;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 12px 16px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .tg-input:focus {
+            border-color: #3b82f6;
+        }
+        .tg-button {
+            width: 100%;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 14px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
         .tg-button:hover { background: #2563eb; }
         .tg-button:active { transform: scale(0.98); }
         .tg-button:disabled { background: #9ca3af; cursor: not-allowed; }
-        .spinner { border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; border-top: 3px solid white; width: 20px; height: 20px; animation: spin 1s linear infinite; }
+        .spinner {
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top: 3px solid white;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(17,24,39,0.92); color: white; padding: 10px 20px; border-radius: 20px; font-size: 13px; opacity: 0; transition: opacity 0.25s; pointer-events: none; z-index: 60; text-align: center; max-width: 90%; }
+        
+        #toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.85);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            z-index: 50;
+            text-align: center;
+            max-width: 90%;
+        }
         .toast-visible { opacity: 1 !important; }
         .tg-table th { background: #f9fafb; font-weight: 600; color: #4b5563; font-size: 12px; text-transform: uppercase; padding: 8px; }
         .tg-table td { padding: 8px; font-size: 14px; border-bottom: 1px solid #f3f4f6; }
@@ -26,52 +86,1393 @@
 </head>
 <body class="text-gray-900 min-h-screen pb-10">
 
-    <!-- Индикатор офлайн-режима -->
-    <div id="offlineBanner" class="hidden bg-red-600 text-white text-xs text-center py-1.5 px-3 font-semibold sticky top-0 z-30">
-        📡 Нет подключения к интернету. Операции временно недоступны.
-    </div>
-
-    <!-- Локальный DEV-бар (активен ТОЛЬКО на localhost/127.0.0.1, полностью недоступен на github.io) -->
+    <!-- Dev Mode Switcher Bar -->
     <div id="devBar" class="hidden bg-amber-500 text-white text-xs py-2 px-3 shadow-sm">
         <div class="max-w-md mx-auto flex items-center justify-between gap-2">
-            <span class="font-bold">🛠️ LOCAL PREVIEW:</span>
-            <select id="devUserSelect" class="bg-white text-gray-900 font-semibold rounded-lg px-2 py-1 text-xs outline-none"></select>
+            <span class="font-bold flex items-center gap-1">🛠️ DEV РЕЖИМ:</span>
+            <select id="devUserSelect" onchange="switchDevUser(this.value)" class="bg-white text-gray-900 font-semibold rounded-lg px-2 py-1 text-xs outline-none cursor-pointer">
+            </select>
         </div>
     </div>
 
-    <!-- Верхняя панель -->
+    <!-- Top Bar -->
     <div class="bg-white sticky top-0 z-10 shadow-sm border-b border-gray-200">
         <div class="max-w-md mx-auto p-4 flex items-center justify-between">
-            <div class="flex items-center gap-2 truncate pr-2">
-                <span class="font-semibold text-lg truncate" id="appTitle">ПВЗ Учет</span>
-                <span id="syncIndicator" class="w-2 h-2 rounded-full bg-green-500 shrink-0" title="Синхронизировано"></span>
+            <span class="font-semibold text-lg truncate pr-2" id="appTitle">ПВЗ Учет</span>
+            <div class="flex items-center gap-2 shrink-0">
+                <input type="month" id="monthSelector" class="hidden text-sm border border-gray-200 bg-gray-50 rounded px-2 py-1 outline-none text-gray-700">
             </div>
-            <input type="month" id="monthSelector" class="hidden text-sm border border-gray-200 bg-gray-50 rounded px-2 py-1 outline-none text-gray-700 shrink-0">
         </div>
     </div>
 
-    <!-- Основной контейнер -->
+    <!-- Main Content Area -->
     <div id="app" class="max-w-md mx-auto p-4 mt-2">
         <div id="loadingScreen" class="flex flex-col justify-center items-center h-48 space-y-3">
             <div class="spinner border-blue-500 border-t-transparent w-8 h-8"></div>
-            <div class="text-sm text-gray-500 font-medium" id="loadingText">Проверка подписи Telegram...</div>
+            <div class="text-sm text-gray-500 font-medium" id="loadingText">Авторизация...</div>
         </div>
         <div id="dashboard" class="hidden"></div>
     </div>
 
-    <!-- Модальное окно подтверждения деструктивных действий -->
-    <div id="confirmModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-xl">
-            <h3 class="font-bold text-gray-900 text-base mb-1" id="confirmTitle">Подтвердите действие</h3>
-            <p class="text-sm text-gray-600 mb-4" id="confirmText">Вы уверены?</p>
-            <div class="flex gap-2">
-                <button id="confirmCancelBtn" class="flex-1 py-2.5 rounded-xl bg-gray-100 text-gray-700 font-semibold text-sm">Отмена</button>
-                <button id="confirmOkBtn" class="flex-1 py-2.5 rounded-xl bg-red-600 text-white font-semibold text-sm">Подтвердить</button>
-            </div>
-        </div>
-    </div>
+    <!-- Toast Notification -->
+    <div id="toast">Действие выполнено</div>
 
-    <div id="toast"></div>
-    <script type="module" src="./src/main.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, collection, addDoc, doc, onSnapshot, 
+            setDoc, runTransaction, query, orderBy 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // =========================================================================
+        // КОНСТАНТЫ АДМИНИСТРАТОРА И БЕЗОПАСНОСТИ
+        // =========================================================================
+        const MASTER_ADMIN_TG_ID = '6250414521';
+        let isDevModeEnabled = localStorage.getItem('pvz_dev_mode') === 'true';
+
+        const myFirebaseConfig = {
+            apiKey: "AIzaSyBtFfBweIhTgVu1w2GLJnsc62-RWKxRx7w",
+            authDomain: "pvz-full.firebaseapp.com",
+            projectId: "pvz-full",
+            storageBucket: "pvz-full.firebasestorage.app",
+            messagingSenderId: "245623016274",
+            appId: "1:245623016274:web:28c54b7f75390d061a488b",
+            measurementId: "G-27K24FMFCD"
+        };
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'pvz-logistics-app';
+        const firebaseConfig = Object.keys(myFirebaseConfig).length > 0 
+            ? myFirebaseConfig 
+            : (typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {});
+
+        let db, auth;
+        let eventsData = [];
+        let usersData = {};
+        let selectedMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+        let ownerTab = 'dashboard';
+        let historyLimit = 30; // Пагинация истории
+        
+        // Тарифы хранятся в КОПЕЙКАХ (целые числа для исключения ошибок округления)
+        const DEFAULT_TARIFFS_KOPECKS = {
+            boxFulfillmentPrice: 4500, // 45.00 ₽
+            boxCourierPay: 3000,       // 30.00 ₽
+            itemCourierPay: 200,       // 2.00 ₽
+            itemOzonRevenue: 1000      // 10.00 ₽
+        };
+        let tariffsData = { ...DEFAULT_TARIFFS_KOPECKS };
+
+        const ROOT_OWNERS = {
+            'owner_6250414521': { role: 'owner', name: 'Богдан', tg_id: MASTER_ADMIN_TG_ID, tg_username: 'ddr712' },
+        };
+
+        const DEV_DEMO_USERS = {
+            'owner_6250414521': { id: 'owner_6250414521', role: 'owner', name: 'Богдан (Владелец)', tg_id: MASTER_ADMIN_TG_ID, tg_username: 'ddr712' },
+            'dev_fulfillment': { id: 'dev_fulfillment', role: 'fulfillment', name: 'Склад ФФ (Тест)', tg_id: '111111', tg_username: 'ff_test' },
+            'dev_courier': { id: 'dev_courier', role: 'courier', name: 'Иван Курьер (Тест)', tg_id: '222222', tg_username: 'courier_test' }
+        };
+
+        let currentUser = null;
+        let realTgUserId = null;
+        let unsubscribeEvents = null;
+        let unsubscribeUsers = null;
+        let unsubscribeTariffs = null;
+
+        // =========================================================================
+        // УТИЛИТЫ БЕЗОПАСНОСТИ И ДЕНЕЖНЫХ РАСЧЕТОВ
+        // =========================================================================
+        
+        // Защита от XSS при вставке пользовательских строк в HTML
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // Маскирование части Telegram ID
+        function maskTgId(id) {
+            const s = String(id || '');
+            if (s.length <= 4) return s;
+            return s.slice(0, 2) + '***' + s.slice(-2);
+        }
+
+        // Перевод рублей в целые копейки
+        function rubToKopecks(rub) {
+            const num = parseFloat(String(rub).replace(',', '.'));
+            if (!Number.isFinite(num) || num < 0) return NaN;
+            return Math.round(num * 100);
+        }
+
+        // Форматирование копеек в рубли (убирает .00 если сумма целая)
+        function formatMoney(kopecks) {
+            const val = (Number(kopecks) || 0) / 100;
+            return Number.isInteger(val) ? `${val}` : val.toFixed(2);
+        }
+
+        // Извлечение исторического тарифа из документа (обратная совместимость со старыми записями)
+        function getEventRate(ev, rateKey) {
+            if (ev.tariffSnapshot && typeof ev.tariffSnapshot[rateKey] === 'number') {
+                return ev.tariffSnapshot[rateKey];
+            }
+            // Если запись старая (без снапшота) и суммы были в рублях, приводим к копейкам
+            return tariffsData[rateKey] || DEFAULT_TARIFFS_KOPECKS[rateKey];
+        }
+
+        // Извлечение суммы платежа/выплаты в копейках (поддержка старых записей в рублях)
+        function getEventAmountKopecks(ev) {
+            if (typeof ev.amountKopecks === 'number') return ev.amountKopecks;
+            if (typeof ev.amount === 'number') return Math.round(ev.amount * 100);
+            return 0;
+        }
+
+        function isMasterAdmin() {
+            const isBrowserAdmin = !realTgUserId && isDevModeEnabled;
+            return String(realTgUserId) === MASTER_ADMIN_TG_ID || 
+                   String(currentUser?.tg_id) === MASTER_ADMIN_TG_ID || 
+                   isBrowserAdmin;
+        }
+
+        // =========================================================================
+        // ИНИЦИАЛИЗАЦИЯ И АВТОРИЗАЦИЯ
+        // =========================================================================
+        async function init() {
+            const tg = window.Telegram?.WebApp;
+            if (tg) {
+                tg.ready();
+                tg.expand();
+            }
+
+            try {
+                if (Object.keys(firebaseConfig).length > 0) {
+                    const app = initializeApp(firebaseConfig);
+                    db = getFirestore(app);
+                    auth = getAuth(app);
+
+                    const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                    if (token && Object.keys(myFirebaseConfig).length === 0) {
+                        await signInWithCustomToken(auth, token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                    
+                    setupTariffsListener();
+                    setupUsersListener(tg);
+                } else {
+                    showFatalError('Ошибка: не указаны ключи Firebase.');
+                }
+            } catch (error) {
+                console.error("Init error:", error);
+                if (isDevModeEnabled) {
+                    usersData = { ...DEV_DEMO_USERS };
+                    performSeamlessAuth(tg);
+                } else {
+                    showFatalError(`Ошибка инициализации: ${escapeHtml(error.message)}`);
+                }
+            }
+        }
+
+        function showFatalError(msg) {
+            document.getElementById('app').innerHTML = `<div class="text-red-500 p-4 text-center font-medium">${msg}</div>`;
+        }
+
+        function getUsersPath() {
+            return Object.keys(myFirebaseConfig).length > 0 ? 'users_registry' : `artifacts/${appId}/public/data/users_registry`;
+        }
+        function getEventsPath() {
+            return Object.keys(myFirebaseConfig).length > 0 ? 'events' : `artifacts/${appId}/public/data/events`;
+        }
+        function getSettingsPath() {
+            return Object.keys(myFirebaseConfig).length > 0 ? 'settings' : `artifacts/${appId}/public/data/settings`;
+        }
+
+        function setupTariffsListener() {
+            const tariffDocRef = doc(db, getSettingsPath(), 'tariffs');
+            if (unsubscribeTariffs) unsubscribeTariffs();
+
+            unsubscribeTariffs = onSnapshot(tariffDocRef, async (snapshot) => {
+                if (snapshot.exists()) {
+                    const data = snapshot.data();
+                    // Миграция: если в базе тарифы лежали в рублях (< 500), переводим в копейки
+                    if (data.version === 2) {
+                        tariffsData = { ...DEFAULT_TARIFFS_KOPECKS, ...data };
+                    } else {
+                        tariffsData = {
+                            boxFulfillmentPrice: Math.round((data.boxFulfillmentPrice ?? 45) * 100),
+                            boxCourierPay: Math.round((data.boxCourierPay ?? 30) * 100),
+                            itemCourierPay: Math.round((data.itemCourierPay ?? 2) * 100),
+                            itemOzonRevenue: Math.round((data.itemOzonRevenue ?? 10) * 100),
+                            version: 2
+                        };
+                    }
+                } else {
+                    await setDoc(tariffDocRef, { ...DEFAULT_TARIFFS_KOPECKS, version: 2 }).catch(() => {});
+                }
+                if (currentUser) renderUI();
+            }, (error) => {
+                console.error("Tariffs error:", error);
+                showToast("Ошибка синхронизации тарифов");
+            });
+        }
+
+        function setupUsersListener(tg) {
+            const usersRef = collection(db, getUsersPath());
+            if (unsubscribeUsers) unsubscribeUsers();
+
+            unsubscribeUsers = onSnapshot(usersRef, async (snapshot) => {
+                usersData = {};
+                snapshot.forEach((doc) => {
+                    usersData[doc.id] = { id: doc.id, ...doc.data() };
+                });
+                
+                if (Object.keys(usersData).length === 0) {
+                    for (const [key, val] of Object.entries(ROOT_OWNERS)) {
+                        await setDoc(doc(db, getUsersPath(), key), val).catch(() => {});
+                    }
+                    if (!isDevModeEnabled) return;
+                }
+
+                if (isDevModeEnabled && isMasterAdmin()) {
+                    for (const [k, v] of Object.entries(DEV_DEMO_USERS)) {
+                        if (!usersData[k]) usersData[k] = v;
+                    }
+                }
+
+                if (!currentUser) {
+                    performSeamlessAuth(tg);
+                } else {
+                    renderUI();
+                }
+            }, (error) => {
+                console.error("Users error:", error);
+                if (isDevModeEnabled) {
+                    usersData = { ...DEV_DEMO_USERS };
+                    performSeamlessAuth(tg);
+                } else {
+                    showFatalError("Ошибка загрузки списка доступа");
+                }
+            });
+        }
+
+        function updateDevBar() {
+            const devBar = document.getElementById('devBar');
+            const select = document.getElementById('devUserSelect');
+            
+            if (!isDevModeEnabled || !isMasterAdmin()) {
+                devBar.classList.add('hidden');
+                return;
+            }
+
+            devBar.classList.remove('hidden');
+            const roleLabels = { owner: '👑 Владелец', fulfillment: '📦 Фулфилмент', courier: '🚚 Курьер' };
+            
+            const availableUsers = { ...usersData };
+            for (const [k, v] of Object.entries(DEV_DEMO_USERS)) {
+                if (!availableUsers[k]) availableUsers[k] = v;
+            }
+
+            select.innerHTML = Object.values(availableUsers).map(u => `
+                <option value="${escapeHtml(u.id)}" ${currentUser && currentUser.id === u.id ? 'selected' : ''}>
+                    ${roleLabels[u.role] || escapeHtml(u.role)}: ${escapeHtml(u.name)}
+                </option>
+            `).join('');
+        }
+
+        window.switchDevUser = function(userId) {
+            if (!isMasterAdmin() || !isDevModeEnabled) return;
+            const targetUser = usersData[userId] || DEV_DEMO_USERS[userId];
+            if (targetUser) {
+                if (!usersData[userId]) usersData[userId] = targetUser;
+                login(userId);
+                showToast(`Переключено на: ${targetUser.name}`);
+            }
+        };
+
+        window.toggleDevMode = function(enabled) {
+            if (!isMasterAdmin()) return;
+
+            isDevModeEnabled = enabled;
+            localStorage.setItem('pvz_dev_mode', enabled ? 'true' : 'false');
+
+            if (enabled) {
+                for (const [k, v] of Object.entries(DEV_DEMO_USERS)) {
+                    if (!usersData[k]) usersData[k] = v;
+                }
+                showToast("🛠️ DEV-режим включен");
+            } else {
+                const ownerKey = Object.keys(usersData).find(k => String(usersData[k].tg_id) === MASTER_ADMIN_TG_ID) || 'owner_6250414521';
+                if (currentUser && currentUser.id !== ownerKey && usersData[ownerKey]) {
+                    login(ownerKey);
+                }
+                showToast("DEV-режим выключен");
+            }
+            renderUI();
+        };
+
+        async function performSeamlessAuth(tg) {
+            const tgUser = tg?.initDataUnsafe?.user;
+            if (tgUser && tgUser.id) {
+                realTgUserId = String(tgUser.id);
+            }
+            
+            let matchedKey = null;
+
+            if (!tgUser || !tgUser.id) {
+                if (isDevModeEnabled) {
+                    const savedUserId = localStorage.getItem('pvz_user_id');
+                    matchedKey = (savedUserId && usersData[savedUserId]) ? savedUserId : 'owner_6250414521';
+                    if (matchedKey && usersData[matchedKey]) {
+                        login(matchedKey);
+                        return;
+                    }
+                } else {
+                    document.getElementById('app').innerHTML = `
+                        <div class="tg-card text-center py-10 my-10 border border-amber-200 bg-amber-50 shadow-sm">
+                            <div class="text-3xl mb-3">⚠️</div>
+                            <h2 class="font-bold text-amber-900 text-lg mb-2">Доступ ограничен</h2>
+                            <p class="text-sm text-amber-800 mb-4 px-2">Пожалуйста, откройте это приложение через Telegram Mini App в официальном чате.</p>
+                        </div>
+                    `;
+                    return;
+                }
+            }
+
+            if (tgUser) {
+                if (String(tgUser.id) === MASTER_ADMIN_TG_ID && isDevModeEnabled) {
+                    const savedUserId = localStorage.getItem('pvz_user_id');
+                    if (savedUserId && usersData[savedUserId]) {
+                        matchedKey = savedUserId;
+                    }
+                }
+
+                if (!matchedKey) {
+                    matchedKey = Object.keys(usersData).find(k => {
+                        const u = usersData[k];
+                        return u.tg_id && String(u.tg_id) === String(tgUser.id);
+                    });
+                }
+
+                if (!matchedKey) {
+                    const rootKey = Object.keys(ROOT_OWNERS).find(k => ROOT_OWNERS[k].tg_id === String(tgUser.id));
+                    if (rootKey) {
+                        await setDoc(doc(db, getUsersPath(), rootKey), ROOT_OWNERS[rootKey]);
+                        matchedKey = rootKey;
+                    }
+                }
+
+                if (!matchedKey) {
+                    document.getElementById('app').innerHTML = `
+                        <div class="tg-card text-center py-10 my-10 border border-red-200 bg-red-50 shadow-sm">
+                            <div class="text-3xl mb-3">🚫</div>
+                            <h2 class="font-bold text-red-900 text-lg mb-2">Доступ запрещен</h2>
+                            <p class="text-sm text-red-700 mb-4 px-2">Ваш Telegram ID (${escapeHtml(tgUser.id)}) не зарегистрирован в системе.</p>
+                            <a href="https://t.me/ddr712" target="_blank" class="inline-block bg-blue-500 hover:bg-blue-600 text-white font-semibold px-5 py-2.5 rounded-xl text-sm shadow-sm transition">Связаться с администратором (@ddr712)</a>
+                        </div>
+                    `;
+                    return;
+                }
+            }
+
+            if (matchedKey && usersData[matchedKey]) {
+                login(matchedKey);
+            }
+        }
+
+        function login(userId) {
+            // Сбрасываем старый слушатель событий при смене пользователя
+            if (unsubscribeEvents) {
+                unsubscribeEvents();
+                unsubscribeEvents = null;
+            }
+            eventsData = [];
+            historyLimit = 30;
+
+            currentUser = { id: userId, ...usersData[userId] };
+            localStorage.setItem('pvz_user_id', userId);
+            
+            document.getElementById('loadingScreen').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+            document.getElementById('monthSelector').classList.remove('hidden');
+            
+            const roleTitle = currentUser.role === 'owner' ? 'Владелец' : currentUser.role === 'fulfillment' ? 'Фулфилмент' : 'Курьер';
+            document.getElementById('appTitle').textContent = `${currentUser.name} (${roleTitle})`;
+            
+            updateDevBar();
+
+            const monthInput = document.getElementById('monthSelector');
+            monthInput.value = selectedMonth;
+            monthInput.onchange = (e) => {
+                selectedMonth = e.target.value;
+                historyLimit = 30;
+                renderUI();
+            };
+            
+            setupEventsListener();
+        }
+
+        function setupEventsListener() {
+            const eventsRef = query(collection(db, getEventsPath()), orderBy('timestamp', 'desc'));
+            if (unsubscribeEvents) unsubscribeEvents();
+
+            unsubscribeEvents = onSnapshot(eventsRef, (snapshot) => {
+                const fetched = [];
+                snapshot.forEach((docSnap) => {
+                    const data = docSnap.data();
+                    // Нормализация timestamp
+                    const ts = typeof data.timestamp === 'number' && Number.isFinite(data.timestamp) ? data.timestamp : 0;
+                    fetched.push({ id: docSnap.id, ...data, timestamp: ts });
+                });
+                eventsData = fetched;
+                renderUI();
+            }, (error) => {
+                console.error("Events error:", error);
+                showToast("Ошибка синхронизации операций");
+            });
+        }
+
+        window.showToast = function(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.add('toast-visible');
+            setTimeout(() => toast.classList.remove('toast-visible'), 3000);
+        };
+
+        function getFilteredEvents() {
+            return eventsData.filter(e => {
+                if (!e.timestamp) return false;
+                const date = new Date(e.timestamp);
+                const m = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                return m === selectedMonth;
+            });
+        }
+
+        // =========================================================================
+        // АТОМАРНЫЕ ТРАНЗАКЦИИ (ЗАЩИТА ОТ ГОНОК ДАННЫХ)
+        // =========================================================================
+
+        // 1. Взятие задания курьером (атомарная проверка courierId === null)
+        window.claimTask = async function(taskId, btnEl) {
+            if (currentUser?.role !== 'courier') return showToast("Доступно только курьерам");
+            if (btnEl) btnEl.disabled = true;
+
+            try {
+                const taskRef = doc(db, getEventsPath(), taskId);
+                await runTransaction(db, async (transaction) => {
+                    const sfDoc = await transaction.get(taskRef);
+                    if (!sfDoc.exists()) throw new Error("Задание не найдено");
+                    const data = sfDoc.data();
+                    if (data.type !== 'items') throw new Error("Неверный тип записи");
+                    if (data.courierId !== null && data.courierId !== undefined) {
+                        throw new Error("Задание уже забрал другой курьер!");
+                    }
+                    transaction.update(taskRef, { 
+                        courierId: currentUser.id,
+                        claimedAt: Date.now()
+                    });
+                });
+                showToast("Задание принято!");
+            } catch (error) {
+                showToast(error.message);
+                if (btnEl) btnEl.disabled = false;
+            }
+        };
+
+        // 2. Подтверждение оплаты владельцем (атомарная проверка status === 'pending')
+        window.approvePayment = async function(eventId, btnEl) {
+            if (currentUser?.role !== 'owner') return showToast("Доступно только владельцам");
+            if (btnEl) btnEl.disabled = true;
+
+            try {
+                const evRef = doc(db, getEventsPath(), eventId);
+                await runTransaction(db, async (transaction) => {
+                    const sfDoc = await transaction.get(evRef);
+                    if (!sfDoc.exists()) throw new Error("Запись не найдена");
+                    const data = sfDoc.data();
+                    if (data.status !== 'pending') {
+                        throw new Error("Эта оплата уже была обработана!");
+                    }
+                    transaction.update(evRef, { 
+                        status: 'approved', 
+                        approvedBy: currentUser.id,
+                        approvedAt: Date.now()
+                    });
+                });
+                showToast("Оплата подтверждена!");
+            } catch (error) {
+                showToast(error.message);
+                if (btnEl) btnEl.disabled = false;
+            }
+        };
+
+        // 3. Подтверждение приемки коробок фулфилментом (атомарная проверка status === 'pending')
+        window.approveBoxes = async function(eventId, btnEl) {
+            if (currentUser?.role !== 'fulfillment') return showToast("Доступно только фулфилменту");
+            if (btnEl) btnEl.disabled = true;
+
+            try {
+                const evRef = doc(db, getEventsPath(), eventId);
+                await runTransaction(db, async (transaction) => {
+                    const sfDoc = await transaction.get(evRef);
+                    if (!sfDoc.exists()) throw new Error("Запись не найдена");
+                    const data = sfDoc.data();
+                    if (data.status !== 'pending') {
+                        throw new Error("Коробки уже подтверждены!");
+                    }
+                    transaction.update(evRef, { 
+                        status: 'approved', 
+                        approvedByFulfillment: currentUser.id,
+                        approvedAt: Date.now()
+                    });
+                });
+                showToast("Приемка коробок подтверждена!");
+            } catch (error) {
+                showToast(error.message);
+                if (btnEl) btnEl.disabled = false;
+            }
+        };
+
+        // 4. Отмена неподтвержденного действия автором (если ошиблись при вводе)
+        window.cancelPendingEvent = async function(eventId) {
+            try {
+                const evRef = doc(db, getEventsPath(), eventId);
+                await runTransaction(db, async (transaction) => {
+                    const sfDoc = await transaction.get(evRef);
+                    if (!sfDoc.exists()) throw new Error("Запись уже удалена");
+                    const data = sfDoc.data();
+                    
+                    if (data.authorId !== currentUser.id && currentUser.role !== 'owner') {
+                        throw new Error("Нет прав на отмену");
+                    }
+                    if (data.type === 'items' && data.courierId) {
+                        throw new Error("Нельзя отменить: курьер уже забрал задание");
+                    }
+                    if ((data.type === 'boxes' || data.type === 'payment') && data.status !== 'pending') {
+                        throw new Error("Нельзя отменить уже подтвержденную операцию");
+                    }
+                    transaction.delete(evRef);
+                });
+                showToast("Запись отменена");
+            } catch (error) {
+                showToast(error.message);
+            }
+        };
+
+        // 5. Добавление участника с защитой от дубликатов Telegram ID
+        window.addNewUser = async function() {
+            if (currentUser?.role !== 'owner') return showToast("Нет прав");
+
+            const name = document.getElementById('newUserName').value.trim();
+            const role = document.getElementById('newUserRole').value;
+            const tgId = document.getElementById('newUserTgId').value.trim();
+            const tgUsername = document.getElementById('newUserTgUsername').value.trim().replace('@', '');
+
+            if (!name || name.length > 50) return showToast("Введите корректное имя (до 50 символов)");
+            if (!/^\d{4,15}$/.test(tgId)) return showToast("Telegram ID должен состоять только из цифр");
+            if (!['owner', 'fulfillment', 'courier'].includes(role)) return showToast("Некорректная роль");
+
+            // Проверка на дубликат Telegram ID
+            const duplicate = Object.values(usersData).find(u => String(u.tg_id) === tgId);
+            if (duplicate) {
+                return showToast(`Пользователь с ID ${tgId} уже существует (${duplicate.name})`);
+            }
+
+            const newKey = `user_${tgId}`;
+            try {
+                await setDoc(doc(db, getUsersPath(), newKey), {
+                    name: name,
+                    role: role,
+                    tg_id: tgId,
+                    tg_username: tgUsername,
+                    createdAt: Date.now(),
+                    createdBy: currentUser.id
+                });
+                document.getElementById('newUserName').value = '';
+                document.getElementById('newUserTgId').value = '';
+                document.getElementById('newUserTgUsername').value = '';
+                showToast("Участник успешно добавлен!");
+            } catch (error) {
+                showToast("Ошибка: " + error.message);
+            }
+        };
+
+        // 6. Сохранение тарифов (в копейках)
+        window.saveTariffs = async function() {
+            if (!currentUser || currentUser.role !== 'owner') {
+                return showToast("Доступ только для владельцев");
+            }
+
+            const boxFFKopecks = rubToKopecks(document.getElementById('tariffBoxFulfillment').value);
+            const boxCKopecks = rubToKopecks(document.getElementById('tariffBoxCourier').value);
+            const itemCKopecks = rubToKopecks(document.getElementById('tariffItemCourier').value);
+            const itemOzonKopecks = rubToKopecks(document.getElementById('tariffItemOzon').value);
+
+            if ([boxFFKopecks, boxCKopecks, itemCKopecks, itemOzonKopecks].some(v => isNaN(v) || v < 0 || v > 10000000)) {
+                return showToast("Введите корректные суммы тарифов");
+            }
+
+            const btn = document.getElementById('btnSaveTariffs');
+            if (btn) {
+                btn.innerHTML = '<div class="spinner"></div>';
+                btn.disabled = true;
+            }
+
+            try {
+                const newTariffs = {
+                    boxFulfillmentPrice: boxFFKopecks,
+                    boxCourierPay: boxCKopecks,
+                    itemCourierPay: itemCKopecks,
+                    itemOzonRevenue: itemOzonKopecks,
+                    version: 2,
+                    updatedBy: currentUser.id,
+                    updatedAt: Date.now()
+                };
+                await setDoc(doc(db, getSettingsPath(), 'tariffs'), newTariffs);
+                showToast("Новые тарифы сохранены (применятся к новым операциям)");
+            } catch (error) {
+                showToast("Ошибка сохранения: " + error.message);
+            } finally {
+                if (btn) {
+                    btn.innerHTML = 'Сохранить тарифы';
+                    btn.disabled = false;
+                }
+            }
+        };
+
+        window.switchOwnerTab = function(tab) {
+            if (currentUser?.role !== 'owner') return;
+            ownerTab = tab;
+            historyLimit = 30;
+            renderUI();
+        };
+
+        window.loadMoreHistory = function() {
+            historyLimit += 30;
+            renderUI();
+        };
+
+        // =========================================================================
+        // ПОДСЧЕТ ФИНАНСОВ С УЧЕТОМ ИСТОРИЧЕСКИХ СНАПШОТОВ ТАРИФОВ
+        // =========================================================================
+        function calculateFinancialMetrics(allEvents, monthEvents) {
+            // 1. Общие долги за все время (с учетом тарифов на момент каждой операции)
+            let totalBoxesBilledKopecks = 0;
+            let totalBoxesCountAll = 0;
+            allEvents.filter(e => e.type === 'boxes' && e.status === 'approved').forEach(e => {
+                totalBoxesCountAll += e.count;
+                totalBoxesBilledKopecks += e.count * getEventRate(e, 'boxFulfillmentPrice');
+            });
+
+            let approvedPaymentsKopecks = 0;
+            let pendingPaymentsKopecks = 0;
+            allEvents.filter(e => e.type === 'payment').forEach(e => {
+                const amt = getEventAmountKopecks(e);
+                if (e.status === 'approved') approvedPaymentsKopecks += amt;
+                else if (e.status === 'pending') pendingPaymentsKopecks += amt;
+            });
+
+            const fulfillmentDebtKopecks = Math.max(0, totalBoxesBilledKopecks - approvedPaymentsKopecks);
+
+            // 2. Общий долг перед всеми курьерами
+            let totalCourierEarnedAllKopecks = 0;
+            allEvents.forEach(e => {
+                if (e.type === 'boxes' && e.status === 'approved') {
+                    totalCourierEarnedAllKopecks += e.count * getEventRate(e, 'boxCourierPay');
+                } else if (e.type === 'items' && e.courierId) {
+                    totalCourierEarnedAllKopecks += e.count * getEventRate(e, 'itemCourierPay');
+                }
+            });
+
+            let totalPayoutsAllKopecks = 0;
+            allEvents.filter(e => e.type === 'payout').forEach(e => {
+                totalPayoutsAllKopecks += getEventAmountKopecks(e);
+            });
+
+            const totalCourierDebtKopecks = Math.max(0, totalCourierEarnedAllKopecks - totalPayoutsAllKopecks);
+
+            // 3. Показатели за выбранный месяц
+            let monthOzonRevenueKopecks = 0;
+            let monthFulfillmentBoxesKopecks = 0;
+            let monthCourierPayKopecks = 0;
+
+            monthEvents.forEach(e => {
+                if (e.type === 'items' && e.courierId) {
+                    monthOzonRevenueKopecks += e.count * getEventRate(e, 'itemOzonRevenue');
+                    monthCourierPayKopecks += e.count * getEventRate(e, 'itemCourierPay');
+                } else if (e.type === 'boxes' && e.status === 'approved') {
+                    monthFulfillmentBoxesKopecks += e.count * getEventRate(e, 'boxFulfillmentPrice');
+                    monthCourierPayKopecks += e.count * getEventRate(e, 'boxCourierPay');
+                }
+            });
+
+            const monthOperatingMarginKopecks = (monthOzonRevenueKopecks + monthFulfillmentBoxesKopecks) - monthCourierPayKopecks;
+
+            return {
+                totalBoxesCountAll,
+                fulfillmentDebtKopecks,
+                approvedPaymentsKopecks,
+                pendingPaymentsKopecks,
+                totalBoxesBilledKopecks,
+                totalCourierDebtKopecks,
+                monthOzonRevenueKopecks,
+                monthCourierPayKopecks,
+                monthOperatingMarginKopecks
+            };
+        }
+
+        function renderUI() {
+            const dashboard = document.getElementById('dashboard');
+            if (!currentUser) return;
+
+            updateDevBar();
+
+            if (currentUser.role === 'fulfillment') renderFulfillment(dashboard);
+            else if (currentUser.role === 'courier') renderCourier(dashboard);
+            else if (currentUser.role === 'owner') renderOwner(dashboard);
+        }
+
+        // --- ROLE 1: FULFILLMENT ---
+        function renderFulfillment(container) {
+            const filteredEvents = getFilteredEvents();
+            const metrics = calculateFinancialMetrics(eventsData, filteredEvents);
+            const currentRateRub = formatMoney(tariffsData.boxFulfillmentPrice);
+            
+            let pendingHtml = metrics.pendingPaymentsKopecks > 0 ? `
+                <div class="mt-3 bg-white/20 border border-white/20 rounded-lg p-2 flex items-center justify-between text-xs">
+                    <span class="font-medium text-white">Ожидает подтверждения владельцем:</span>
+                    <span class="font-bold">${formatMoney(metrics.pendingPaymentsKopecks)} ₽</span>
+                </div>
+            ` : '';
+
+            const pendingBoxes = eventsData.filter(e => e.type === 'boxes' && e.status === 'pending');
+            let pendingBoxesHtml = pendingBoxes.length > 0 ? `
+                <div class="mb-5">
+                    <h3 class="text-xs font-bold text-orange-500 uppercase tracking-wider mb-2">Подтверждение приемки коробок</h3>
+                    <div class="space-y-2">
+                        ${pendingBoxes.map(b => `
+                            <div class="bg-orange-50 p-3 rounded-xl border border-orange-200 flex justify-between items-center shadow-sm">
+                                <div>
+                                    <div class="text-xs text-gray-500 font-medium">Привез ${escapeHtml(usersData[b.authorId]?.name || 'Курьер')}</div>
+                                    <div class="font-bold text-gray-800 text-lg">${b.count} кор.</div>
+                                    <div class="text-[11px] text-gray-500">Тариф: ${formatMoney(getEventRate(b, 'boxFulfillmentPrice'))} ₽/шт</div>
+                                </div>
+                                <button onclick="approveBoxes('${escapeHtml(b.id)}', this)" class="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-sm">Подтвердить</button>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            ` : '';
+
+            container.innerHTML = `
+                ${pendingBoxesHtml}
+                <div class="tg-card bg-gradient-to-br from-rose-500 to-red-600 text-white shadow-md mb-4 !p-4">
+                    <div class="text-[10px] text-rose-100 font-semibold mb-1 uppercase tracking-wider flex justify-between items-center">
+                        <span>Текущий долг за коробки (Тариф: ${currentRateRub}₽/шт)</span>
+                        <span>📦</span>
+                    </div>
+                    <div class="text-3xl font-black mb-3">${formatMoney(metrics.fulfillmentDebtKopecks)} ₽</div>
+                    <div class="flex justify-between items-center text-sm border-t border-rose-400/30 pt-3 mt-1">
+                        <div>
+                            <div class="text-[10px] text-rose-200">Всего коробок принято</div>
+                            <div class="font-semibold text-rose-50">${metrics.totalBoxesCountAll} шт</div>
+                        </div>
+                    </div>
+                    ${pendingHtml}
+                </div>
+
+                <div class="tg-card border border-green-200 mb-4 shadow-sm">
+                    <h2 class="font-bold text-gray-800 mb-3">Внести оплату долга</h2>
+                    <div class="flex gap-2">
+                        <input type="number" step="0.01" id="inputPayment" class="tg-input !mb-0" placeholder="Сумма, ₽" min="0.01">
+                        <button id="btnSubmitPayment" class="tg-button !w-auto px-6 bg-green-500 hover:bg-green-600 shadow-sm">Отправить</button>
+                    </div>
+                </div>
+
+                <div class="tg-card border border-blue-200">
+                    <h2 class="font-bold text-gray-800 mb-3">Создать задание на отгрузку</h2>
+                    <label class="block text-xs font-medium text-gray-600 mb-1 uppercase">Количество собранных ШК</label>
+                    <input type="number" id="inputItems" class="tg-input mb-4" placeholder="Введите целое число" min="1" step="1">
+                    <button id="btnSubmitItems" class="tg-button shadow-sm">Опубликовать задание</button>
+                </div>
+
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mt-6 mb-2">История заданий и оплат</h3>
+                <div id="fulfillmentHistory" class="space-y-2"></div>
+            `;
+
+            document.getElementById('btnSubmitItems').addEventListener('click', async (e) => {
+                const rawVal = document.getElementById('inputItems').value;
+                const items = Number(rawVal);
+                if (!Number.isInteger(items) || items <= 0 || items > 100000) {
+                    return showToast("Введите корректное целое число ШК");
+                }
+                const btn = e.currentTarget;
+                btn.innerHTML = '<div class="spinner"></div>';
+                btn.disabled = true;
+                try {
+                    await addDoc(collection(db, getEventsPath()), {
+                        type: 'items',
+                        count: items,
+                        courierId: null,
+                        authorId: currentUser.id,
+                        timestamp: Date.now(),
+                        // Фиксируем текущие тарифы в момент создания задания
+                        tariffSnapshot: {
+                            itemCourierPay: tariffsData.itemCourierPay,
+                            itemOzonRevenue: tariffsData.itemOzonRevenue
+                        }
+                    });
+                    document.getElementById('inputItems').value = '';
+                    showToast("Задание опубликовано!");
+                } catch (error) { showToast("Ошибка: " + error.message); }
+                finally { btn.innerHTML = 'Опубликовать задание'; btn.disabled = false; }
+            });
+
+            document.getElementById('btnSubmitPayment').addEventListener('click', async (e) => {
+                const amountKopecks = rubToKopecks(document.getElementById('inputPayment').value);
+                if (isNaN(amountKopecks) || amountKopecks <= 0) {
+                    return showToast("Введите корректную сумму");
+                }
+
+                const btn = e.currentTarget;
+                btn.innerHTML = '<div class="spinner"></div>';
+                btn.disabled = true;
+
+                try {
+                    // Пересчитываем актуальный доступный лимит перед отправкой
+                    const freshMetrics = calculateFinancialMetrics(eventsData, []);
+                    const maxAllowedKopecks = freshMetrics.totalBoxesBilledKopecks - freshMetrics.approvedPaymentsKopecks - freshMetrics.pendingPaymentsKopecks;
+
+                    if (maxAllowedKopecks <= 0) {
+                        throw new Error("Долг уже погашен или ожидает подтверждения");
+                    }
+                    if (amountKopecks > maxAllowedKopecks) {
+                        throw new Error(`Максимально доступно: ${formatMoney(maxAllowedKopecks)} ₽`);
+                    }
+
+                    await addDoc(collection(db, getEventsPath()), {
+                        type: 'payment',
+                        amountKopecks: amountKopecks,
+                        status: 'pending',
+                        authorId: currentUser.id,
+                        timestamp: Date.now()
+                    });
+                    document.getElementById('inputPayment').value = '';
+                    showToast("Оплата отправлена на проверку!");
+                } catch (error) { showToast(error.message); }
+                finally { btn.innerHTML = 'Отправить'; btn.disabled = false; }
+            });
+
+            renderHistoryList('fulfillmentHistory', filteredEvents.filter(e => e.type === 'items' || e.type === 'payment' || e.type === 'boxes'));
+        }
+
+        // --- ROLE 2: COURIER ---
+        function renderCourier(container) {
+            const filteredEvents = getFilteredEvents();
+            
+            // Баланс курьера за все время по историческим ставкам
+            let allEarnedKopecks = 0;
+            eventsData.forEach(e => {
+                if (e.type === 'boxes' && e.authorId === currentUser.id && e.status === 'approved') {
+                    allEarnedKopecks += e.count * getEventRate(e, 'boxCourierPay');
+                } else if (e.type === 'items' && e.courierId === currentUser.id) {
+                    allEarnedKopecks += e.count * getEventRate(e, 'itemCourierPay');
+                }
+            });
+            let allPayoutsKopecks = 0;
+            eventsData.filter(e => e.type === 'payout' && e.courierId === currentUser.id).forEach(e => {
+                allPayoutsKopecks += getEventAmountKopecks(e);
+            });
+            const overallBalanceKopecks = Math.max(0, allEarnedKopecks - allPayoutsKopecks);
+
+            // Заработок за выбранный месяц
+            let monthItemsEarnKopecks = 0;
+            let monthBoxesEarnKopecks = 0;
+            filteredEvents.forEach(e => {
+                if (e.type === 'items' && e.courierId === currentUser.id) {
+                    monthItemsEarnKopecks += e.count * getEventRate(e, 'itemCourierPay');
+                } else if (e.type === 'boxes' && e.authorId === currentUser.id && e.status === 'approved') {
+                    monthBoxesEarnKopecks += e.count * getEventRate(e, 'boxCourierPay');
+                }
+            });
+            const totalMonthEarningsKopecks = monthItemsEarnKopecks + monthBoxesEarnKopecks;
+
+            const activeTasks = eventsData.filter(e => e.type === 'items' && !e.courierId);
+            let activeTasksHtml = activeTasks.length > 0 ? `
+                <div class="mb-5">
+                    <h3 class="text-xs font-bold text-orange-500 uppercase tracking-wider mb-2">Доступные задания</h3>
+                    <div class="space-y-2">
+                        ${activeTasks.map(t => {
+                            const rateRub = formatMoney(getEventRate(t, 'itemCourierPay'));
+                            return `
+                            <div class="bg-orange-50 p-3 rounded-xl border border-orange-200 flex justify-between items-center shadow-sm">
+                                <div>
+                                    <div class="font-bold text-gray-800 text-lg">Собрано: ${t.count} ШК</div>
+                                    <div class="text-xs text-gray-500">${new Date(t.timestamp).toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'})} • ${rateRub} ₽/ШК</div>
+                                </div>
+                                <button onclick="claimTask('${escapeHtml(t.id)}', this)" class="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-sm">Забрать</button>
+                            </div>
+                        `}).join('')}
+                    </div>
+                </div>
+            ` : '';
+
+            container.innerHTML = `
+                <div class="tg-card bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-md">
+                    <div class="flex justify-between items-start mb-1">
+                        <div class="text-sm font-medium opacity-90">Заработано (за месяц)</div>
+                        <div class="text-xs font-bold bg-white/20 px-2 py-1 rounded">К выплате: ${formatMoney(overallBalanceKopecks)} ₽</div>
+                    </div>
+                    <div class="text-3xl font-bold mb-3">${formatMoney(totalMonthEarningsKopecks)} ₽</div>
+                    <div class="flex justify-between text-sm border-t border-white/20 pt-3 mt-2">
+                        <div>Товары: <span class="font-semibold">${formatMoney(monthItemsEarnKopecks)} ₽</span></div>
+                        <div>Коробки: <span class="font-semibold">${formatMoney(monthBoxesEarnKopecks)} ₽</span></div>
+                    </div>
+                </div>
+                
+                ${activeTasksHtml}
+
+                <div class="tg-card border border-blue-100 shadow-sm mt-4">
+                    <h3 class="font-bold text-gray-800 mb-3">Привез коробки (Тариф: ${formatMoney(tariffsData.boxCourierPay)} ₽/шт)</h3>
+                    <label class="block text-xs font-medium text-gray-600 mb-1 uppercase">Количество коробок</label>
+                    <div class="flex gap-2">
+                        <input type="number" id="inputBoxes" class="tg-input !mb-0" placeholder="шт." min="1" step="1">
+                        <button id="btnSubmitBoxes" class="tg-button !w-auto px-6 shadow-sm">Сдать</button>
+                    </div>
+                </div>
+
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mt-6 mb-2">Моя история (за месяц)</h3>
+                <div id="courierHistory" class="space-y-2"></div>
+            `;
+
+            document.getElementById('btnSubmitBoxes').addEventListener('click', async (e) => {
+                const boxes = Number(document.getElementById('inputBoxes').value);
+                if (!Number.isInteger(boxes) || boxes <= 0 || boxes > 10000) {
+                    return showToast("Введите корректное целое число коробок");
+                }
+                const btn = e.currentTarget;
+                btn.innerHTML = '<div class="spinner"></div>';
+                btn.disabled = true;
+                try {
+                    await addDoc(collection(db, getEventsPath()), {
+                        type: 'boxes',
+                        count: boxes,
+                        authorId: currentUser.id,
+                        timestamp: Date.now(),
+                        status: 'pending',
+                        // Фиксируем текущие тарифы для курьера и фулфилмента
+                        tariffSnapshot: {
+                            boxCourierPay: tariffsData.boxCourierPay,
+                            boxFulfillmentPrice: tariffsData.boxFulfillmentPrice
+                        }
+                    });
+                    document.getElementById('inputBoxes').value = '';
+                    showToast("Коробки отправлены на подтверждение!");
+                } catch (error) { showToast("Ошибка: " + error.message); }
+                finally { btn.innerHTML = 'Сдать'; btn.disabled = false; }
+            });
+
+            renderHistoryList('courierHistory', filteredEvents.filter(e => e.authorId === currentUser.id || e.courierId === currentUser.id));
+        }
+
+        // --- ROLE 3: OWNER ---
+        function renderOwner(container) {
+            const filteredEvents = getFilteredEvents();
+            const metrics = calculateFinancialMetrics(eventsData, filteredEvents);
+            
+            const rBoxFF = formatMoney(tariffsData.boxFulfillmentPrice);
+            const rBoxC = formatMoney(tariffsData.boxCourierPay);
+            const rItemC = formatMoney(tariffsData.itemCourierPay);
+            const rItemOzon = formatMoney(tariffsData.itemOzonRevenue);
+
+            const boxMarginRub = formatMoney(tariffsData.boxFulfillmentPrice - tariffsData.boxCourierPay);
+            const itemMarginRub = formatMoney(tariffsData.itemOzonRevenue - tariffsData.itemCourierPay);
+
+            let tabsHtml = `
+                <div class="flex bg-gray-200 p-1 rounded-xl mb-4 gap-1">
+                    <button onclick="switchOwnerTab('dashboard')" class="flex-1 py-2 text-[11px] font-bold rounded-lg transition ${ownerTab === 'dashboard' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'}">📊 Финансы</button>
+                    <button onclick="switchOwnerTab('team')" class="flex-1 py-2 text-[11px] font-bold rounded-lg transition ${ownerTab === 'team' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'}">👥 Команда</button>
+                    <button onclick="switchOwnerTab('tariffs')" class="flex-1 py-2 text-[11px] font-bold rounded-lg transition ${ownerTab === 'tariffs' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'}">⚙️ Настройки</button>
+                </div>
+            `;
+
+            if (ownerTab === 'team') {
+                const roleNames = { owner: 'Владелец', fulfillment: 'Фулфилмент', courier: 'Курьер' };
+                const roleColors = { owner: 'bg-purple-100 text-purple-700', fulfillment: 'bg-rose-100 text-rose-700', courier: 'bg-blue-100 text-blue-700' };
+                
+                let usersListHtml = Object.values(usersData).map(u => `
+                    <div class="bg-white p-3 rounded-xl border border-gray-200 flex justify-between items-center shadow-sm">
+                        <div>
+                            <div class="font-bold text-gray-800 text-sm">${escapeHtml(u.name)}</div>
+                            <div class="text-xs text-gray-500">ID: ${escapeHtml(maskTgId(u.tg_id))} ${u.tg_username ? '(@' + escapeHtml(u.tg_username) + ')' : ''}</div>
+                        </div>
+                        <span class="text-xs font-bold px-2.5 py-1 rounded-full ${roleColors[u.role] || 'bg-gray-100 text-gray-700'}">${roleNames[u.role] || escapeHtml(u.role)}</span>
+                    </div>
+                `).join('');
+
+                container.innerHTML = `
+                    ${tabsHtml}
+                    <div class="tg-card mb-4 border border-purple-100 shadow-sm">
+                        <h3 class="text-sm font-bold text-gray-800 mb-3">➕ Добавить нового участника</h3>
+                        <div class="space-y-3">
+                            <input type="text" id="newUserName" class="tg-input !p-2.5 text-sm" placeholder="Имя участника" maxlength="50">
+                            <div class="grid grid-cols-2 gap-2">
+                                <select id="newUserRole" class="tg-input !p-2.5 text-sm">
+                                    <option value="courier">Курьер</option>
+                                    <option value="fulfillment">Фулфилмент</option>
+                                    <option value="owner">Владелец</option>
+                                </select>
+                                <input type="text" id="newUserTgId" class="tg-input !p-2.5 text-sm" placeholder="Telegram ID (цифры)">
+                            </div>
+                            <input type="text" id="newUserTgUsername" class="tg-input !p-2.5 text-sm" placeholder="Telegram Username (@)">
+                            <button onclick="addNewUser()" class="tg-button bg-purple-600 hover:bg-purple-700 py-3 text-sm shadow-sm">Сохранить участника</button>
+                        </div>
+                    </div>
+
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Список всех участников (${Object.keys(usersData).length})</h3>
+                    <div class="space-y-2 mb-6">
+                        ${usersListHtml}
+                    </div>
+                `;
+                return;
+            }
+
+            if (ownerTab === 'tariffs') {
+                const devToggleBlock = isMasterAdmin() ? `
+                    <div class="tg-card border border-amber-200 bg-amber-50/60 shadow-sm mb-4">
+                        <div class="flex items-center justify-between">
+                            <div class="pr-3">
+                                <h3 class="text-sm font-bold text-amber-900 flex items-center gap-1.5">🛠️ Режим разработчика (DEV)</h3>
+                                <p class="text-[11px] text-amber-800/80 mt-0.5 leading-snug">Позволяет переключаться между ролями и открывать сайт в браузере. Видно только вам.</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer shrink-0">
+                                <input type="checkbox" onchange="toggleDevMode(this.checked)" class="sr-only peer" ${isDevModeEnabled ? 'checked' : ''}>
+                                <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                            </label>
+                        </div>
+                    </div>
+                ` : '';
+
+                container.innerHTML = `
+                    ${tabsHtml}
+                    ${devToggleBlock}
+                    <div class="tg-card border border-indigo-100 shadow-sm mb-4">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <h3 class="text-base font-bold text-gray-800">⚙️ Настройка тарифов</h3>
+                                <p class="text-xs text-gray-500">Применяются только к новым операциям (история не меняется)</p>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div class="p-3 bg-rose-50/60 border border-rose-100 rounded-xl">
+                                <label class="block text-xs font-bold text-rose-800 uppercase mb-1">📦 Цена коробки для Фулфилмента (₽)</label>
+                                <input type="number" id="tariffBoxFulfillment" value="${rBoxFF}" step="0.01" min="0" class="tg-input !bg-white !p-2.5 text-sm font-semibold">
+                            </div>
+
+                            <div class="p-3 bg-emerald-50/60 border border-emerald-100 rounded-xl space-y-3">
+                                <div>
+                                    <label class="block text-xs font-bold text-emerald-800 uppercase mb-1">🚚 Оплата курьеру за 1 коробку (₽)</label>
+                                    <input type="number" id="tariffBoxCourier" value="${rBoxC}" step="0.01" min="0" class="tg-input !bg-white !p-2.5 text-sm font-semibold">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-emerald-800 uppercase mb-1">🛍️ Оплата курьеру за 1 ШК (₽)</label>
+                                    <input type="number" id="tariffItemCourier" value="${rItemC}" step="0.01" min="0" class="tg-input !bg-white !p-2.5 text-sm font-semibold">
+                                </div>
+                            </div>
+
+                            <div class="p-3 bg-indigo-50/60 border border-indigo-100 rounded-xl">
+                                <label class="block text-xs font-bold text-indigo-800 uppercase mb-1">💙 Выплата от Ozon за 1 ШК (₽)</label>
+                                <input type="number" id="tariffItemOzon" value="${rItemOzon}" step="0.01" min="0" class="tg-input !bg-white !p-2.5 text-sm font-semibold">
+                            </div>
+
+                            <div class="bg-gray-50 p-3 rounded-xl border border-gray-200 text-xs space-y-1">
+                                <div class="font-bold text-gray-700 mb-1">Операционная маржа по текущим ставкам:</div>
+                                <div class="flex justify-between text-gray-600">
+                                    <span>С 1 коробки (${rBoxFF}₽ − ${rBoxC}₽):</span>
+                                    <span class="font-bold text-gray-900">${boxMarginRub} ₽</span>
+                                </div>
+                                <div class="flex justify-between text-gray-600">
+                                    <span>С 1 товара ШК (${rItemOzon}₽ − ${rItemC}₽):</span>
+                                    <span class="font-bold text-gray-900">${itemMarginRub} ₽</span>
+                                </div>
+                            </div>
+
+                            <button id="btnSaveTariffs" onclick="saveTariffs()" class="tg-button bg-indigo-600 hover:bg-indigo-700 py-3 text-sm shadow-sm">Сохранить тарифы</button>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            // Вкладка: ФИНАНСЫ
+            const pendingPayments = eventsData.filter(e => e.type === 'payment' && e.status === 'pending');
+            let pendingHtml = pendingPayments.length > 0 ? `
+                <div class="tg-card border border-yellow-300 bg-yellow-50 mb-4 shadow-sm">
+                    <h3 class="text-sm font-bold text-yellow-800 mb-2">Взаиморасчеты (На подпись)</h3>
+                    <div class="space-y-2">
+                        ${pendingPayments.map(p => `
+                            <div class="bg-white p-2.5 rounded-lg border border-yellow-200 flex justify-between items-center shadow-sm">
+                                <div>
+                                    <div class="font-bold text-gray-800 text-lg">${formatMoney(getEventAmountKopecks(p))} ₽</div>
+                                    <div class="text-[11px] text-gray-500">Внес ${escapeHtml(usersData[p.authorId]?.name || 'Фулфилмент')}</div>
+                                </div>
+                                <button onclick="approvePayment('${escapeHtml(p.id)}', this)" class="bg-yellow-500 hover:bg-yellow-600 text-white text-xs font-bold px-4 py-2 rounded-lg shadow-sm">Подтвердить</button>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            ` : '';
+
+            const couriers = Object.values(usersData).filter(u => u.role === 'courier');
+            let payrollRows = '';
+            let courierOptions = '';
+            
+            couriers.forEach(c => {
+                let cBoxesMonth = 0, cItemsMonth = 0, payoutMonthKopecks = 0;
+                filteredEvents.forEach(e => {
+                    if (e.type === 'boxes' && e.authorId === c.id && e.status === 'approved') {
+                        cBoxesMonth += e.count;
+                        payoutMonthKopecks += e.count * getEventRate(e, 'boxCourierPay');
+                    } else if (e.type === 'items' && e.courierId === c.id) {
+                        cItemsMonth += e.count;
+                        payoutMonthKopecks += e.count * getEventRate(e, 'itemCourierPay');
+                    }
+                });
+
+                let cAllEarnedKopecks = 0, cAllPayoutsKopecks = 0;
+                eventsData.forEach(e => {
+                    if (e.type === 'boxes' && e.authorId === c.id && e.status === 'approved') {
+                        cAllEarnedKopecks += e.count * getEventRate(e, 'boxCourierPay');
+                    } else if (e.type === 'items' && e.courierId === c.id) {
+                        cAllEarnedKopecks += e.count * getEventRate(e, 'itemCourierPay');
+                    } else if (e.type === 'payout' && e.courierId === c.id) {
+                        cAllPayoutsKopecks += getEventAmountKopecks(e);
+                    }
+                });
+                const currentBalanceKopecks = Math.max(0, cAllEarnedKopecks - cAllPayoutsKopecks);
+                
+                payrollRows += `
+                    <tr>
+                        <td class="font-medium">${escapeHtml(c.name)}<div class="text-[10px] text-gray-400">Долг: ${formatMoney(currentBalanceKopecks)} ₽</div></td>
+                        <td class="text-center">${cItemsMonth}</td>
+                        <td class="text-center">${cBoxesMonth}</td>
+                        <td class="text-right font-bold text-green-700">${formatMoney(payoutMonthKopecks)} ₽</td>
+                    </tr>
+                `;
+                courierOptions += `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)} (Остаток: ${formatMoney(currentBalanceKopecks)} ₽)</option>`;
+            });
+
+            container.innerHTML = `
+                ${tabsHtml}
+                ${pendingHtml}
+                <div class="tg-card bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-md mb-3 !p-4">
+                    <div class="text-[10px] text-indigo-100 font-semibold mb-1 uppercase tracking-wider flex justify-between items-center">
+                        <span>Операционная маржа (за месяц)</span>
+                        <span>💰</span>
+                    </div>
+                    <div class="text-3xl font-black mb-3">${formatMoney(metrics.monthOperatingMarginKopecks)} ₽</div>
+                    <div class="flex justify-between items-center text-sm border-t border-indigo-400/30 pt-3 mt-1">
+                        <div>Оборот Ozon: <span class="font-semibold">${formatMoney(metrics.monthOzonRevenueKopecks)} ₽</span></div>
+                        <div>ЗП курьерам: <span class="font-semibold">${formatMoney(metrics.monthCourierPayKopecks)} ₽</span></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 mb-4">
+                    <div class="bg-white rounded-xl p-3 border border-green-200 shadow-sm flex flex-col justify-between">
+                        <div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Фулфилмент должен нам</div>
+                        <div class="text-xl font-bold text-green-700">${formatMoney(metrics.fulfillmentDebtKopecks)} ₽</div>
+                    </div>
+                    <div class="bg-white rounded-xl p-3 border border-red-200 shadow-sm flex flex-col justify-between">
+                        <div class="text-[10px] text-gray-500 font-bold uppercase mb-1">Мы должны курьерам</div>
+                        <div class="text-xl font-bold text-red-600">${formatMoney(metrics.totalCourierDebtKopecks)} ₽</div>
+                    </div>
+                </div>
+
+                <div class="tg-card mb-4 border border-blue-100 shadow-sm">
+                    <h3 class="text-sm font-bold text-gray-800 mb-3">Списать выплату курьеру</h3>
+                    <div class="flex flex-col gap-2">
+                        <select id="selectCourier" class="tg-input p-2.5 text-sm">${courierOptions || '<option value="">Нет курьеров</option>'}</select>
+                        <div class="flex gap-2">
+                            <input type="number" step="0.01" id="inputPayout" class="tg-input !mb-0" placeholder="Сумма, ₽" min="0.01">
+                            <button id="btnSubmitPayout" class="tg-button !w-auto px-6 shadow-sm">Списать</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tg-card !p-0 overflow-hidden mb-6 border border-gray-200 shadow-sm">
+                    <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+                        <h3 class="text-sm font-bold text-gray-700">Начисления за месяц</h3>
+                    </div>
+                    <table class="w-full tg-table">
+                        <thead>
+                            <tr>
+                                <th class="text-left">Курьер</th>
+                                <th>ШК</th>
+                                <th>Кор</th>
+                                <th class="text-right">ЗП</th>
+                            </tr>
+                        </thead>
+                        <tbody>${payrollRows || '<tr><td colspan="4" class="text-center text-gray-400 py-4">Нет курьеров</td></tr>'}</tbody>
+                    </table>
+                </div>
+
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">История всех операций (за месяц)</h3>
+                <div id="ownerHistory" class="space-y-2"></div>
+            `;
+
+            const btnPayout = document.getElementById('btnSubmitPayout');
+            if (btnPayout) {
+                btnPayout.onclick = async (e) => {
+                    const amountKopecks = rubToKopecks(document.getElementById('inputPayout').value);
+                    const courierId = document.getElementById('selectCourier').value;
+                    if (!courierId) return showToast("Выберите курьера");
+                    if (isNaN(amountKopecks) || amountKopecks <= 0) return showToast("Введите корректную сумму");
+
+                    // Пересчитываем актуальный долг курьеру перед списанием
+                    let cAllEarned = 0, cAllPaid = 0;
+                    eventsData.forEach(ev => {
+                        if (ev.type === 'boxes' && ev.authorId === courierId && ev.status === 'approved') {
+                            cAllEarned += ev.count * getEventRate(ev, 'boxCourierPay');
+                        } else if (ev.type === 'items' && ev.courierId === courierId) {
+                            cAllEarned += ev.count * getEventRate(ev, 'itemCourierPay');
+                        } else if (ev.type === 'payout' && ev.courierId === courierId) {
+                            cAllPaid += getEventAmountKopecks(ev);
+                        }
+                    });
+                    const maxBalanceKopecks = cAllEarned - cAllPaid;
+
+                    if (maxBalanceKopecks <= 0) return showToast("Долг перед курьером отсутствует");
+                    if (amountKopecks > maxBalanceKopecks) return showToast(`Максимально доступно: ${formatMoney(maxBalanceKopecks)} ₽`);
+
+                    const btn = e.currentTarget;
+                    btn.innerHTML = '<div class="spinner"></div>';
+                    btn.disabled = true;
+                    try {
+                        await addDoc(collection(db, getEventsPath()), {
+                            type: 'payout',
+                            amountKopecks: amountKopecks,
+                            courierId: courierId,
+                            authorId: currentUser.id,
+                            timestamp: Date.now()
+                        });
+                        document.getElementById('inputPayout').value = '';
+                        showToast("Выплата списана!");
+                    } catch (error) { showToast("Ошибка: " + error.message); }
+                    finally { btn.innerHTML = 'Списать'; btn.disabled = false; }
+                };
+            }
+
+            renderHistoryList('ownerHistory', filteredEvents);
+        }
+
+        // =========================================================================
+        // РЕНДЕР ИСТОРИИ С ПАГИНАЦИЕЙ И КНОПКОЙ ОТМЕНЫ ОШИБОЧНЫХ ЗАПИСЕЙ
+        // =========================================================================
+        function renderHistoryList(containerId, eventsList) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            if (eventsList.length === 0) {
+                container.innerHTML = '<p class="text-sm text-gray-500 text-center py-4">Нет записей за выбранный месяц</p>';
+                return;
+            }
+
+            const visibleEvents = eventsList.slice(0, historyLimit);
+            let htmlStr = '<div class="space-y-4">';
+            const grouped = {};
+            
+            visibleEvents.forEach(e => {
+                const dateKey = new Date(e.timestamp).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+                if (!grouped[dateKey]) grouped[dateKey] = [];
+                grouped[dateKey].push(e);
+            });
+
+            for (const [dateKey, events] of Object.entries(grouped)) {
+                htmlStr += `<div>
+                    <div class="text-xs font-bold text-gray-500 mb-2 sticky top-[61px] bg-[#f3f4f6] py-1 z-10">${escapeHtml(dateKey)}</div>
+                    <div class="space-y-2">`;
+                
+                events.forEach(e => {
+                    const timeStr = new Date(e.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute:'2-digit' });
+                    const canCancel = (e.authorId === currentUser.id || currentUser.role === 'owner') && (
+                        (e.type === 'items' && !e.courierId) ||
+                        ((e.type === 'boxes' || e.type === 'payment') && e.status === 'pending')
+                    );
+                    const cancelBtn = canCancel ? `<button onclick="cancelPendingEvent('${escapeHtml(e.id)}')" class="text-[11px] text-red-500 underline ml-2">Отменить</button>` : '';
+
+                    if (e.type === 'items') {
+                        const status = e.courierId 
+                            ? `<span class="text-green-600">Забрал ${escapeHtml(usersData[e.courierId]?.name || 'Курьер')}</span>` 
+                            : `<span class="text-orange-500">Ожидает курьера</span>`;
+                        htmlStr += `<div class="bg-white p-3 rounded-lg border border-gray-200 flex justify-between items-center text-sm shadow-sm">
+                            <div class="flex items-center gap-3">
+                                <div class="text-xl">🛍️</div>
+                                <div>
+                                    <div class="font-bold text-gray-800 text-sm">Собрано: ${e.count} ШК</div>
+                                    <div class="text-[11px] mt-0.5">${status}${cancelBtn}</div>
+                                </div>
+                            </div>
+                            <div class="text-[11px] text-gray-400">${timeStr}</div>
+                        </div>`;
+                    } else if (e.type === 'boxes') {
+                        const author = escapeHtml(usersData[e.authorId]?.name || 'Курьер');
+                        const approver = e.approvedByFulfillment ? escapeHtml(usersData[e.approvedByFulfillment]?.name || 'фулфилментом') : 'фулфилментом';
+                        const statusStr = e.status === 'pending' 
+                            ? '<span class="text-orange-500">Ожидает подтверждения</span>' 
+                            : `<span class="text-green-600">Принято (${approver})</span>`;
+                        htmlStr += `<div class="bg-white p-3 rounded-lg border border-gray-200 flex justify-between items-center text-sm shadow-sm">
+                            <div class="flex items-center gap-3">
+                                <div class="text-xl">📦</div>
+                                <div>
+                                    <div class="font-bold text-gray-800 text-sm">Коробки: ${e.count} шт.</div>
+                                    <div class="text-[11px] text-gray-500">Сдал: ${author}</div>
+                                    <div class="text-[11px] mt-0.5">${statusStr}${cancelBtn}</div>
+                                </div>
+                            </div>
+                            <div class="text-[11px] text-gray-400">${timeStr}</div>
+                        </div>`;
+                    } else if (e.type === 'payment') {
+                        const approver = e.approvedBy ? escapeHtml(usersData[e.approvedBy]?.name || 'Владельцем') : 'Владельцем';
+                        const statusStr = e.status === 'approved' 
+                            ? `<span class="text-green-600">Подтверждено (${approver})</span>` 
+                            : `<span class="text-orange-500">Ожидает проверки</span>`;
+                        htmlStr += `<div class="bg-green-50 p-3 rounded-lg border border-green-200 flex justify-between items-center text-sm shadow-sm">
+                            <div class="flex items-center gap-3">
+                                <div class="text-xl">💳</div>
+                                <div>
+                                    <div class="font-bold text-green-900 text-sm">Оплата долга: ${formatMoney(getEventAmountKopecks(e))} ₽</div>
+                                    <div class="text-[11px] mt-0.5">${statusStr}${cancelBtn}</div>
+                                </div>
+                            </div>
+                            <div class="text-[11px] text-gray-400">${timeStr}</div>
+                        </div>`;
+                    } else if (e.type === 'payout') {
+                        const target = escapeHtml(usersData[e.courierId]?.name || 'Курьеру');
+                        htmlStr += `<div class="bg-blue-50 p-3 rounded-lg border border-blue-200 flex justify-between items-center text-sm shadow-sm">
+                            <div class="flex items-center gap-3">
+                                <div class="text-xl">💸</div>
+                                <div>
+                                    <div class="font-bold text-blue-900 text-sm">Списана ЗП: ${formatMoney(getEventAmountKopecks(e))} ₽</div>
+                                    <div class="text-[11px] text-gray-500">Получатель: ${target}</div>
+                                </div>
+                            </div>
+                            <div class="text-[11px] text-gray-400">${timeStr}</div>
+                        </div>`;
+                    }
+                });
+                htmlStr += `</div></div>`;
+            }
+
+            if (eventsList.length > historyLimit) {
+                htmlStr += `<button onclick="loadMoreHistory()" class="w-full py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 shadow-sm">Показать еще (${eventsList.length - historyLimit})</button>`;
+            }
+
+            container.innerHTML = htmlStr + '</div>';
+        }
+
+        init();
+    </script>
 </body>
 </html>
