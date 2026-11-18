@@ -91,7 +91,7 @@
 </head>
 <body class="text-gray-900 min-h-screen pb-10">
 
-    <!-- Dev Mode Switcher Bar -->
+    <!-- Dev Mode Switcher Bar (Виден только владельцу 6250414521 при включенном DEV-режиме) -->
     <div id="devBar" class="hidden bg-amber-500 text-white text-xs py-2 px-3 shadow-sm">
         <div class="max-w-md mx-auto flex items-center justify-between gap-2">
             <span class="font-bold flex items-center gap-1">🛠️ DEV РЕЖИМ:</span>
@@ -131,9 +131,12 @@
         import { getFirestore, collection, addDoc, doc, onSnapshot, updateDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // =========================================================================
-        // РЕЖИМ РАЗРАБОТКИ (Поставьте false перед выкладкой в продакшен)
+        // КОНСТАНТЫ АДМИНИСТРАТОРА И DEV-РЕЖИМА
         // =========================================================================
-        const DEV_MODE = false;
+        const MASTER_ADMIN_TG_ID = '6250414521';
+        
+        // Состояние DEV-режима хранится локально (по умолчанию выключено для безопасности)
+        let isDevModeEnabled = localStorage.getItem('pvz_dev_mode') === 'true';
 
         // =========================================================================
         // ВАШИ КЛЮЧИ ОТ FIREBASE
@@ -169,21 +172,31 @@
         };
         let tariffsData = { ...DEFAULT_TARIFFS };
 
-        // Вшиты владельцы и тестовые роли для DEV-режима
+        // Вшитый владелец
         const ROOT_OWNERS = {
-            'owner_6250414521': { role: 'owner', name: 'Богдан', tg_id: '6250414521', tg_username: '' },
+            'owner_6250414521': { role: 'owner', name: 'Богдан', tg_id: MASTER_ADMIN_TG_ID, tg_username: 'ddr712' },
         };
 
+        // Тестовые аккаунты для переключения в DEV-режиме
         const DEV_DEMO_USERS = {
-            'owner_6250414521': { id: 'owner_6250414521', role: 'owner', name: 'Богдан (Владелец)', tg_id: '6250414521', tg_username: 'ddr712' },
+            'owner_6250414521': { id: 'owner_6250414521', role: 'owner', name: 'Богдан (Владелец)', tg_id: MASTER_ADMIN_TG_ID, tg_username: 'ddr712' },
             'dev_fulfillment': { id: 'dev_fulfillment', role: 'fulfillment', name: 'Склад ФФ (Тест)', tg_id: '111111', tg_username: 'ff_test' },
             'dev_courier': { id: 'dev_courier', role: 'courier', name: 'Иван Курьер (Тест)', tg_id: '222222', tg_username: 'courier_test' }
         };
 
         let currentUser = null;
+        let realTgUserId = null; // Храним реальный ID из Telegram, чтобы помнить, что это именно вы при переключении ролей
         let unsubscribeEvents = null;
         let unsubscribeUsers = null;
         let unsubscribeTariffs = null;
+
+        // Проверка: является ли текущий пользователь главным администратором (6250414521)
+        function isMasterAdmin() {
+            const isBrowserAdmin = !realTgUserId && isDevModeEnabled;
+            return String(realTgUserId) === MASTER_ADMIN_TG_ID || 
+                   String(currentUser?.tg_id) === MASTER_ADMIN_TG_ID || 
+                   isBrowserAdmin;
+        }
 
         async function init() {
             const tg = window.Telegram?.WebApp;
@@ -212,7 +225,7 @@
                 }
             } catch (error) {
                 console.error("Init error:", error);
-                if (DEV_MODE) {
+                if (isDevModeEnabled) {
                     usersData = { ...DEV_DEMO_USERS };
                     performSeamlessAuth(tg);
                 } else {
@@ -265,20 +278,16 @@
                     usersData[doc.id] = { id: doc.id, ...doc.data() };
                 });
                 
-                // Если в базе совсем пусто, записываем корневых владельцев
+                // Если в базе совсем пусто, записываем корневого владельца
                 if (Object.keys(usersData).length === 0) {
                     for (const [key, val] of Object.entries(ROOT_OWNERS)) {
                         await setDoc(doc(db, getUsersPath(), key), val).catch(()=>{});
                     }
-                    if (DEV_MODE) {
-                        usersData = { ...DEV_DEMO_USERS };
-                    } else {
-                        return;
-                    }
+                    if (!isDevModeEnabled) return;
                 }
 
-                // В режиме разработки добавляем демо-пользователей, если их еще нет в списке
-                if (DEV_MODE) {
+                // Добавляем демо-пользователей в память, если включен DEV-режим
+                if (isDevModeEnabled) {
                     for (const [k, v] of Object.entries(DEV_DEMO_USERS)) {
                         if (!usersData[k]) usersData[k] = v;
                     }
@@ -287,7 +296,7 @@
                 performSeamlessAuth(tg);
             }, (error) => {
                 console.error("Users error:", error);
-                usersData = DEV_MODE ? { ...DEV_DEMO_USERS } : ROOT_OWNERS;
+                usersData = isDevModeEnabled ? { ...DEV_DEMO_USERS } : ROOT_OWNERS;
                 performSeamlessAuth(tg);
             });
         }
@@ -295,13 +304,23 @@
         function updateDevBar() {
             const devBar = document.getElementById('devBar');
             const select = document.getElementById('devUserSelect');
-            if (!DEV_MODE) {
+            
+            // Панель видна ТОЛЬКО если DEV-режим включен И пользователь — владелец 6250414521
+            if (!isDevModeEnabled || !isMasterAdmin()) {
                 devBar.classList.add('hidden');
                 return;
             }
+
             devBar.classList.remove('hidden');
             const roleLabels = { owner: '👑 Владелец', fulfillment: '📦 Фулфилмент', courier: '🚚 Курьер' };
-            select.innerHTML = Object.values(usersData).map(u => `
+            
+            // Формируем список всех реальных + тестовых пользователей для удобного переключения
+            const availableUsers = { ...usersData };
+            for (const [k, v] of Object.entries(DEV_DEMO_USERS)) {
+                if (!availableUsers[k]) availableUsers[k] = v;
+            }
+
+            select.innerHTML = Object.values(availableUsers).map(u => `
                 <option value="${u.id}" ${currentUser && currentUser.id === u.id ? 'selected' : ''}>
                     ${roleLabels[u.role] || u.role}: ${u.name}
                 </option>
@@ -309,50 +328,93 @@
         }
 
         window.switchDevUser = function(userId) {
-            if (usersData[userId]) {
+            if (!isMasterAdmin() || !isDevModeEnabled) return;
+            
+            const targetUser = usersData[userId] || DEV_DEMO_USERS[userId];
+            if (targetUser) {
+                if (!usersData[userId]) usersData[userId] = targetUser;
                 login(userId);
-                showToast(`Переключено на: ${usersData[userId].name}`);
+                showToast(`Переключено на: ${targetUser.name}`);
             }
+        };
+
+        // Функция переключения DEV-режима из настроек
+        window.toggleDevMode = function(enabled) {
+            if (!isMasterAdmin()) return;
+
+            isDevModeEnabled = enabled;
+            localStorage.setItem('pvz_dev_mode', enabled ? 'true' : 'false');
+
+            if (enabled) {
+                // Подгружаем демо-пользователей в локальный список
+                for (const [k, v] of Object.entries(DEV_DEMO_USERS)) {
+                    if (!usersData[k]) usersData[k] = v;
+                }
+                showToast("🛠️ DEV-режим включен");
+            } else {
+                // При выключении возвращаем вас обратно в ваш основной аккаунт владельца
+                const ownerKey = Object.keys(usersData).find(k => String(usersData[k].tg_id) === MASTER_ADMIN_TG_ID) || 'owner_6250414521';
+                if (currentUser.id !== ownerKey && usersData[ownerKey]) {
+                    login(ownerKey);
+                }
+                showToast("DEV-режим выключен");
+            }
+            
+            renderUI();
         };
 
         async function performSeamlessAuth(tg) {
             const tgUser = tg?.initDataUnsafe?.user;
+            if (tgUser && tgUser.id) {
+                realTgUserId = String(tgUser.id);
+            }
+            
             let matchedKey = null;
 
-            // Если включен DEV_MODE и мы открыли приложение в обычном браузере без Telegram
-            if ((!tgUser || !tgUser.id) && DEV_MODE) {
-                const savedUserId = localStorage.getItem('pvz_user_id');
-                if (savedUserId && usersData[savedUserId]) {
-                    matchedKey = savedUserId;
+            // 1. Вход в обычном браузере (вне Telegram) разрешен ТОЛЬКО если включен DEV-режим
+            if (!tgUser || !tgUser.id) {
+                if (isDevModeEnabled) {
+                    const savedUserId = localStorage.getItem('pvz_user_id');
+                    if (savedUserId && usersData[savedUserId]) {
+                        matchedKey = savedUserId;
+                    } else {
+                        matchedKey = 'owner_6250414521';
+                    }
+                    if (matchedKey && usersData[matchedKey]) {
+                        login(matchedKey);
+                        return;
+                    }
                 } else {
-                    matchedKey = Object.keys(usersData).find(k => usersData[k].role === 'owner') || Object.keys(usersData)[0];
-                }
-                if (matchedKey) {
-                    login(matchedKey);
+                    document.getElementById('app').innerHTML = `
+                        <div class="tg-card text-center py-10 my-10 border border-amber-200 bg-amber-50 shadow-sm">
+                            <div class="text-3xl mb-3">⚠️</div>
+                            <h2 class="font-bold text-amber-900 text-lg mb-2">Доступ ограничен</h2>
+                            <p class="text-sm text-amber-800 mb-4 px-2">Пожалуйста, откройте это приложение через Telegram Mini App в официальном чате.</p>
+                        </div>
+                    `;
                     return;
                 }
             }
 
-            // Проверяем, открыто ли приложение внутри Telegram (если DEV_MODE выключен)
-            if (!tgUser || !tgUser.id) {
-                document.getElementById('app').innerHTML = `
-                    <div class="tg-card text-center py-10 my-10 border border-amber-200 bg-amber-50 shadow-sm">
-                        <div class="text-3xl mb-3">⚠️</div>
-                        <h2 class="font-bold text-amber-900 text-lg mb-2">Доступ ограничен</h2>
-                        <p class="text-sm text-amber-800 mb-4 px-2">Пожалуйста, откройте это приложение через Telegram Mini App в официальном чате.</p>
-                    </div>
-                `;
-                return;
-            }
-
+            // 2. Вход внутри Telegram
             if (tgUser) {
-                // 1. Ищем в базе по Telegram ID
-                matchedKey = Object.keys(usersData).find(k => {
-                    const u = usersData[k];
-                    return u.tg_id && String(u.tg_id) === String(tgUser.id);
-                });
+                // Если это вы (6250414521) и включен DEV-режим, проверяем, не тестируете ли вы сейчас другую роль
+                if (String(tgUser.id) === MASTER_ADMIN_TG_ID && isDevModeEnabled) {
+                    const savedUserId = localStorage.getItem('pvz_user_id');
+                    if (savedUserId && usersData[savedUserId]) {
+                        matchedKey = savedUserId;
+                    }
+                }
 
-                // 2. Если по ID не нашли, проверяем, не является ли пользователь корневым владельцем из кода
+                // Ищем в базе по Telegram ID
+                if (!matchedKey) {
+                    matchedKey = Object.keys(usersData).find(k => {
+                        const u = usersData[k];
+                        return u.tg_id && String(u.tg_id) === String(tgUser.id);
+                    });
+                }
+
+                // Если по ID не нашли, проверяем корневого владельца
                 if (!matchedKey) {
                     const rootKey = Object.keys(ROOT_OWNERS).find(k => ROOT_OWNERS[k].tg_id === String(tgUser.id));
                     if (rootKey) {
@@ -361,21 +423,17 @@
                     }
                 }
 
-                // 3. Если человека нет ни в базе, ни в корневых владельцах
+                // Если человека нет в базе — доступ запрещен (для всех, кроме 6250414521)
                 if (!matchedKey) {
-                    if (DEV_MODE) {
-                        matchedKey = Object.keys(usersData).find(k => usersData[k].role === 'owner') || Object.keys(usersData)[0];
-                    } else {
-                        document.getElementById('app').innerHTML = `
-                            <div class="tg-card text-center py-10 my-10 border border-red-200 bg-red-50 shadow-sm">
-                                <div class="text-3xl mb-3">🚫</div>
-                                <h2 class="font-bold text-red-900 text-lg mb-2">Доступ запрещен</h2>
-                                <p class="text-sm text-red-700 mb-4 px-2">Ваш Telegram ID (${tgUser.id}) не зарегистрирован в системе.</p>
-                                <a href="https://t.me/ddr712" target="_blank" class="inline-block bg-blue-500 hover:bg-blue-600 text-white font-semibold px-5 py-2.5 rounded-xl text-sm shadow-sm transition">Связаться с администратором (@ddr712)</a>
-                            </div>
-                        `;
-                        return;
-                    }
+                    document.getElementById('app').innerHTML = `
+                        <div class="tg-card text-center py-10 my-10 border border-red-200 bg-red-50 shadow-sm">
+                            <div class="text-3xl mb-3">🚫</div>
+                            <h2 class="font-bold text-red-900 text-lg mb-2">Доступ запрещен</h2>
+                            <p class="text-sm text-red-700 mb-4 px-2">Ваш Telegram ID (${tgUser.id}) не зарегистрирован в системе.</p>
+                            <a href="https://t.me/ddr712" target="_blank" class="inline-block bg-blue-500 hover:bg-blue-600 text-white font-semibold px-5 py-2.5 rounded-xl text-sm shadow-sm transition">Связаться с администратором (@ddr712)</a>
+                        </div>
+                    `;
+                    return;
                 }
             }
 
@@ -776,8 +834,8 @@
             let tabsHtml = `
                 <div class="flex bg-gray-200 p-1 rounded-xl mb-4 gap-1">
                     <button onclick="switchOwnerTab('dashboard')" class="flex-1 py-2 text-[11px] font-bold rounded-lg transition ${ownerTab === 'dashboard' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'}">📊 Финансы</button>
-                    <button onclick="switchOwnerTab('team')" class="flex-1 py-2 text-[11px] font-bold rounded-lg transition ${ownerTab === 'team' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'}">👥 Команда и доступы</button>
-                    <button onclick="switchOwnerTab('tariffs')" class="flex-1 py-2 text-[11px] font-bold rounded-lg transition ${ownerTab === 'tariffs' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'}">⚙️ Тарифы</button>
+                    <button onclick="switchOwnerTab('team')" class="flex-1 py-2 text-[11px] font-bold rounded-lg transition ${ownerTab === 'team' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'}">👥 Команда</button>
+                    <button onclick="switchOwnerTab('tariffs')" class="flex-1 py-2 text-[11px] font-bold rounded-lg transition ${ownerTab === 'tariffs' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'}">⚙️ Настройки</button>
                 </div>
             `;
 
@@ -823,10 +881,27 @@
                 return;
             }
 
-            // Вкладка: ТАРИФЫ (Доступно только владельцам)
+            // Вкладка: НАСТРОЙКИ И ТАРИФЫ
             if (ownerTab === 'tariffs') {
+                // Блок DEV-режима отображается СТРОГО только для ID 6250414521
+                const devToggleBlock = isMasterAdmin() ? `
+                    <div class="tg-card border border-amber-200 bg-amber-50/60 shadow-sm mb-4">
+                        <div class="flex items-center justify-between">
+                            <div class="pr-3">
+                                <h3 class="text-sm font-bold text-amber-900 flex items-center gap-1.5">🛠️ Режим разработчика (DEV)</h3>
+                                <p class="text-[11px] text-amber-800/80 mt-0.5 leading-snug">Позволяет переключаться между ролями курьера, склада и владельца, а также открывать сайт в обычном браузере. Видно только вам.</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer shrink-0">
+                                <input type="checkbox" onchange="toggleDevMode(this.checked)" class="sr-only peer" ${isDevModeEnabled ? 'checked' : ''}>
+                                <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                            </label>
+                        </div>
+                    </div>
+                ` : '';
+
                 container.innerHTML = `
                     ${tabsHtml}
+                    ${devToggleBlock}
                     <div class="tg-card border border-indigo-100 shadow-sm mb-4">
                         <div class="flex items-center justify-between mb-4">
                             <div>
