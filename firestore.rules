@@ -1,0 +1,115 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.role != null;
+    }
+
+    function hasRole(r) {
+      return isSignedIn() && request.auth.token.role == r;
+    }
+
+    function myDocId() {
+      return request.auth.token.userDocId;
+    }
+
+    function isPositiveInt(val) {
+      return val is int && val > 0;
+    }
+
+    // 1. Реестр пользователей
+    match /users_registry/{userId} {
+      allow read: if isSignedIn();
+      // Создавать и изменять участников может только владелец; корневого админа 6250414521 менять нельзя
+      allow create, update: if hasRole('owner')
+        && userId != 'owner_6250414521'
+        && request.resource.data.role in ['owner', 'fulfillment', 'courier']
+        && request.resource.data.tg_id is string
+        && request.resource.data.name is string;
+      allow delete: if false;
+    }
+
+    // 2. Настройки тарифов (только владелец)
+    match /settings/{settingId} {
+      allow read: if isSignedIn();
+      allow write: if hasRole('owner')
+        && request.resource.data.boxFulfillmentPriceKopecks is int
+        && request.resource.data.boxCourierPayKopecks is int
+        && request.resource.data.itemCourierPayKopecks is int
+        && request.resource.data.itemOzonRevenueKopecks is int
+        && request.resource.data.boxFulfillmentPriceKopecks >= 0
+        && request.resource.data.boxCourierPayKopecks >= 0
+        && request.resource.data.itemCourierPayKopecks >= 0
+        && request.resource.data.itemOzonRevenueKopecks >= 0;
+    }
+
+    // 3. События и операции
+    match /events/{eventId} {
+      allow read: if isSignedIn();
+
+      // Создание:
+      // - Фулфилмент создает задания 'items'
+      // - Курьер сдает коробки 'boxes' (явно указывая courierId == myDocId())
+      // - Платежи 'payment' и выплаты 'payout' создаются ТОЛЬКО через Cloud Functions (здесь запрещены)
+      allow create: if isSignedIn()
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.authorId == myDocId()
+        && (
+          (hasRole('fulfillment')
+            && request.resource.data.type == 'items'
+            && isPositiveInt(request.resource.data.count)
+            && request.resource.data.courierId == null
+            && request.resource.data.status == 'pending'
+            && request.resource.data.tariffSnapshot is map)
+          ||
+          (hasRole('courier')
+            && request.resource.data.type == 'boxes'
+            && isPositiveInt(request.resource.data.count)
+            && request.resource.data.courierId == myDocId()
+            && request.resource.data.status == 'pending'
+            && request.resource.data.tariffSnapshot is map)
+        );
+
+      // Обновление (строгие переходы состояний без возможности изменить суммы, тарифы и авторов):
+      allow update: if isSignedIn()
+        && request.resource.data.type == resource.data.type
+        && request.resource.data.authorId == resource.data.authorId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.tariffSnapshot == resource.data.tariffSnapshot
+        && (
+          // А. Курьер забирает свободное задание 'items' (pending -> approved)
+          (hasRole('courier')
+            && resource.data.type == 'items'
+            && resource.data.status == 'pending'
+            && resource.data.courierId == null
+            && request.resource.data.courierId == myDocId()
+            && request.resource.data.status == 'approved'
+            && request.resource.data.count == resource.data.count)
+          ||
+          // Б. Фулфилмент подтверждает приемку коробок 'boxes' (pending -> approved)
+          (hasRole('fulfillment')
+            && resource.data.type == 'boxes'
+            && resource.data.status == 'pending'
+            && request.resource.data.status == 'approved'
+            && request.resource.data.courierId == resource.data.courierId
+            && request.resource.data.count == resource.data.count)
+          ||
+          // В. Владелец подтверждает оплату долга 'payment' (pending -> approved)
+          (hasRole('owner')
+            && resource.data.type == 'payment'
+            && resource.data.status == 'pending'
+            && request.resource.data.status == 'approved'
+            && request.resource.data.amountKopecks == resource.data.amountKopecks)
+          ||
+          // Г. Мягкая отмена (pending -> cancelled) автором или владельцем вместо физического удаления
+          ((resource.data.authorId == myDocId() || hasRole('owner'))
+            && resource.data.status == 'pending'
+            && request.resource.data.status == 'cancelled')
+        );
+
+      // Физическое удаление документов из журнала аудита полностью запрещено
+      allow delete: if false;
+    }
+  }
+}
